@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   endSession,
@@ -13,20 +14,29 @@ import {
 import { db, type User } from "@/lib/db";
 import { isUploadPath } from "@/lib/files";
 import { createPost, retryJob } from "@/lib/jobs";
+import { isLocale, type ErrorCode } from "@/i18n";
+import { getT } from "@/i18n/server";
 
 const MIN_PASSWORD = 8;
 
-function fail(page: "login" | "register", message: string): never {
-  redirect(`/${page}?error=${encodeURIComponent(message)}`);
+/** Errors travel as codes; the page shows them in the user's language. */
+function fail(page: "login" | "register", code: ErrorCode): never {
+  redirect(`/${page}?error=${code}`);
+}
+
+export async function setLocale(locale: string) {
+  if (!isLocale(locale)) return;
+  (await cookies()).set("lang", locale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  revalidatePath("/", "layout");
 }
 
 export async function register(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  if (!/^\S+@\S+\.\S+$/.test(email)) fail("register", "Geçerli bir e-posta gir.");
-  if (password.length < MIN_PASSWORD) fail("register", `Şifre en az ${MIN_PASSWORD} karakter olmalı.`);
+  if (!/^\S+@\S+\.\S+$/.test(email)) fail("register", "invalidEmail");
+  if (password.length < MIN_PASSWORD) fail("register", "shortPassword");
   if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
-    fail("register", "Bu e-posta zaten kayıtlı. Giriş yap.");
+    fail("register", "emailTaken");
   }
 
   const userId = db.transaction(() => {
@@ -46,7 +56,7 @@ export async function login(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email) as User | undefined;
   if (!user || !verifyPassword(password, user.password_hash)) {
-    fail("login", "E-posta veya şifre yanlış.");
+    fail("login", "wrongCredentials");
   }
   await startSession(user.id);
   redirect("/");
@@ -72,8 +82,9 @@ export async function sendPost(formData: FormData) {
   const accountId = Number(formData.get("accountId"));
   const filePath = String(formData.get("filePath") ?? "");
   const title = String(formData.get("title") ?? "").trim();
-  if (!ownAccount(user.id, accountId)) throw new Error("Hesap bulunamadı");
-  if (!isUploadPath(filePath) || !title) throw new Error("Video veya başlık eksik");
+  const { t } = await getT();
+  if (!ownAccount(user.id, accountId)) throw new Error(t.errors.accountNotFound);
+  if (!isUploadPath(filePath) || !title) throw new Error(t.errors.missingVideo);
 
   const duration = Number(formData.get("durationSec"));
   const videoId = createPost({
