@@ -48,7 +48,17 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
       <div className="cols cols-post">
         <section className="stack">
-          <VideoThumb id={video.id} durationSec={video.duration_sec} large />
+          {video.file_path ? (
+            <video
+              className="player"
+              src={`/api/videos/${video.id}/file`}
+              controls
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <VideoThumb id={video.id} durationSec={video.duration_sec} large />
+          )}
           <h1 className="post-title">{video.title}</h1>
           <div className="meta muted">
             <span>{account.name}</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { sendPost } from "@/app/actions";
 import { ArrowRight, Close, Info, Upload } from "@/components/icons";
 import { PlatformMark } from "@/components/platform-mark";
@@ -58,6 +58,15 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
   const [selected, setSelected] = useState(() => new Set(targets.map((x) => x.id)));
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Local preview of the picked file; released when the file changes.
+  useEffect(() => {
+    if (!file) return setPreviewUrl(null);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const busy = progress !== null;
   const canSend = !!file && title.trim() !== "" && selected.size > 0 && !busy;
@@ -108,7 +117,11 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
 
         {file ? (
           <div className="file-row">
-            <span className="thumb thumb-sm" aria-hidden="true" />
+            {previewUrl ? (
+              <video className="thumb thumb-sm" src={`${previewUrl}#t=0.1`} muted playsInline preload="metadata" aria-hidden="true" />
+            ) : (
+              <span className="thumb thumb-sm" aria-hidden="true" />
+            )}
             <span className="file-meta">
               <span className="file-name">{file.name}</span>
               <span className="num muted">{[dur, sizeMb].filter(Boolean).join(" · ")}</span>

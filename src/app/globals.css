@@ -362,7 +362,12 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--primary)
   position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   width: 72px; aspect-ratio: 16 / 9; border-radius: 8px; background: #5B5F97; color: #FFFFFF;
 }
-.thumb-sm { width: 64px; height: 40px; aspect-ratio: auto; }
+.thumb-sm { width: 64px; height: 40px; aspect-ratio: auto; object-fit: cover; }
+/* Shorts are vertical: keep the whole frame visible, letterboxed. */
+.player {
+  display: block; width: 100%; max-height: min(70vh, 640px);
+  aspect-ratio: 16 / 9; object-fit: contain; background: #000; border-radius: 16px;
+}
 .thumb-lg { width: 100%; border-radius: 16px; }
 .thumb-dur {
   position: absolute; right: 4px; bottom: 4px; font-size: 10px; line-height: 1.3;
