@@ -8,7 +8,7 @@ Next.js + React + TypeScript, Node.js, SQLite, ffmpeg, yt-dlp. No separate backe
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 22+
 - ffmpeg and yt-dlp on `PATH`
 
 ## Setup
