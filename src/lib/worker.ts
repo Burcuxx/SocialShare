@@ -6,10 +6,11 @@ import * as tiktok from "./tiktok";
 const MAX_ATTEMPTS = 3;
 const POLL_MS = 5000;
 
-type Uploader = (conn: Connection, filePath: string, job: Job) => Promise<string>;
+type Uploader = (conn: Connection, filePath: string, job: Job, video: Video) => Promise<string>;
 
 const uploaders: Partial<Record<Connection["platform"], Uploader>> = {
-  tiktok: (conn, filePath) => tiktok.uploadDraft(conn, filePath),
+  tiktok: (conn, filePath, job, video) =>
+    tiktok.publishVideo(conn, filePath, job.caption ?? "", video.duration_sec),
 };
 
 function setStatus(jobId: number, status: Job["status"], extra: Partial<Job> = {}) {
@@ -68,7 +69,7 @@ async function runJob(job: Job) {
     const filePath = await ensureFile(video);
 
     setStatus(job.id, "uploading");
-    const remoteId = await upload(conn, filePath, job);
+    const remoteId = await upload(conn, filePath, job, video);
 
     setStatus(job.id, "done", { remote_id: remoteId, error: null });
   } catch (e) {

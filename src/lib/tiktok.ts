@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import { db, type Connection } from "./db";
 
 const API = "https://open.tiktokapis.com/v2";
-const SCOPE = "user.info.basic,video.upload";
+const SCOPE = "user.info.basic,video.publish";
 const MB = 1024 * 1024;
 
 function redirectUri() {
@@ -133,22 +133,37 @@ function chunking(size: number) {
   return { chunkSize, count: Math.max(1, Math.floor(size / chunkSize)) };
 }
 
+type CreatorInfo = { privacy_level_options: string[]; max_video_post_duration_sec: number };
+
 /**
- * Uploads the video to the creator's TikTok inbox as a draft.
- * The user finishes the post (caption, privacy) in the TikTok app.
+ * Posts the video directly with its caption (Direct Post).
+ * Until TikTok audits the app, posts are forced to "only me" (SELF_ONLY);
+ * after the audit they go out public automatically.
  * Returns the publish_id.
  */
-export async function uploadDraft(conn: Connection, filePath: string) {
+export async function publishVideo(
+  conn: Connection,
+  filePath: string,
+  title: string,
+  durationSec: number | null,
+) {
   const token = await accessToken(conn);
+  const creator = await call<CreatorInfo>("/post/publish/creator_info/query/", token, {
+    method: "POST",
+  });
+  if (durationSec && durationSec > creator.max_video_post_duration_sec) {
+    throw new Error(
+      `Video TikTok için çok uzun (${durationSec} sn, en fazla ${creator.max_video_post_duration_sec} sn)`,
+    );
+  }
+
   const size = (await fs.stat(filePath)).size;
   const { chunkSize, count } = chunking(size);
-
-  const init = await call<{ publish_id: string; upload_url: string }>(
-    "/post/publish/inbox/video/init/",
-    token,
-    {
+  const init = (privacy: string) =>
+    call<{ publish_id: string; upload_url: string }>("/post/publish/video/init/", token, {
       method: "POST",
       body: JSON.stringify({
+        post_info: { title: title.slice(0, 2200), privacy_level: privacy },
         source_info: {
           source: "FILE_UPLOAD",
           video_size: size,
@@ -156,8 +171,30 @@ export async function uploadDraft(conn: Connection, filePath: string) {
           total_chunk_count: count,
         },
       }),
-    },
-  );
+    });
+
+  let post;
+  if (creator.privacy_level_options.includes("PUBLIC_TO_EVERYONE")) {
+    try {
+      post = await init("PUBLIC_TO_EVERYONE");
+    } catch (e) {
+      if (!(e as Error).message.includes("unaudited_client")) throw e;
+      post = await init("SELF_ONLY");
+    }
+  } else {
+    post = await init("SELF_ONLY");
+  }
+  return uploadAndWait(token, post, filePath, size, chunkSize, count);
+}
+
+async function uploadAndWait(
+  token: string,
+  init: { publish_id: string; upload_url: string },
+  filePath: string,
+  size: number,
+  chunkSize: number,
+  count: number,
+) {
 
   const file = await fs.open(filePath, "r");
   try {
@@ -182,19 +219,17 @@ export async function uploadDraft(conn: Connection, filePath: string) {
     await file.close();
   }
 
-  // Wait until TikTok has put the draft in the inbox (or failed).
+  // Wait until TikTok has published the post (or failed).
   for (let i = 0; i < 60; i++) {
     const status = await call<{ status: string; fail_reason?: string }>(
       "/post/publish/status/fetch/",
       token,
       { method: "POST", body: JSON.stringify({ publish_id: init.publish_id }) },
     );
-    if (status.status === "SEND_TO_USER_INBOX" || status.status === "PUBLISH_COMPLETE") {
-      return init.publish_id;
-    }
+    if (status.status === "PUBLISH_COMPLETE") return init.publish_id;
     if (status.status === "FAILED") throw new Error(`TikTok rejected the video: ${status.fail_reason}`);
     await new Promise((r) => setTimeout(r, 5000));
   }
-  // The bytes are uploaded; retrying would create a duplicate draft, so treat it as sent.
+  // The bytes are uploaded; retrying would post the video twice, so treat it as sent.
   return init.publish_id;
 }

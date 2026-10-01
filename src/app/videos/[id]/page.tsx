@@ -5,7 +5,6 @@ import { DOWNLOAD_ERROR } from "@/lib/download";
 import { jobsForVideo } from "@/lib/jobs";
 import { retry, sendVideo } from "../../actions";
 import { AutoRefresh } from "./auto-refresh";
-import { CopyButton } from "./copy-button";
 import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
@@ -92,8 +91,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
                 />
                 {t.platform === "tiktok" && (
                   <p className="muted">
-                    TikTok'a taslak olarak gider. TikTok bu metni otomatik eklemiyor; gönderdikten
-                    sonra buradan kopyalayıp TikTok uygulamasında yapıştırırsın.
+                    TikTok uygulamayı onaylayana kadar video "Sadece ben" olarak paylaşılır.
                   </p>
                 )}
               </>
@@ -102,8 +100,8 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
             {job?.error && job.status !== "done" && <p className="error">{job.error}</p>}
             {job?.status === "done" && t.platform === "tiktok" && (
               <p className="muted">
-                Taslak TikTok'ta hazır. TikTok uygulamasındaki bildirime dokunup metni yapıştır ve
-                paylaş.
+                TikTok'ta paylaşıldı. "Sadece ben" görünüyorsa TikTok'ta videoyu açıp görünürlüğü
+                Herkes yap.
               </p>
             )}
             {job && (
@@ -115,7 +113,6 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
                     <button>Tekrar dene</button>
                   </form>
                 )}
-                {t.platform === "tiktok" && job.caption && <CopyButton text={job.caption} />}
               </div>
             )}
           </section>

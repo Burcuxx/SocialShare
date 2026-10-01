@@ -37,12 +37,12 @@ Video lists are cached in SQLite and only re-fetched when you press **Yenile** (
 
 1. Sign in at [TikTok for Developers](https://developers.tiktok.com/) and create an app.
 2. Platform: **Desktop** (only desktop apps may redirect to `localhost`; the app uses PKCE).
-3. Add products **Login Kit** and **Content Posting API**; scopes `user.info.basic` and `video.upload`.
+3. Add products **Login Kit** and **Content Posting API** (turn on **Direct Post**); scopes `user.info.basic` and `video.publish`.
 4. Redirect URI: `http://localhost:3000/api/auth/tiktok/callback`
 5. Use **Sandbox** mode and add your TikTok accounts as target users (no app review needed).
 6. Put the client key and secret into `.env`.
 
-Videos go to the TikTok inbox as drafts. TikTok does not accept a caption for drafts, so copy it from the app and finish the post in TikTok. TikTok allows at most 5 pending drafts per 24 hours.
+Videos are posted directly with their caption (Direct Post). Until TikTok audits the app, posts are forced to "only me"; change the visibility in TikTok afterwards. Once the app is audited, posts go out public automatically.
 
 ## How sending works
 
