@@ -45,11 +45,14 @@ type TokenResponse = {
 async function tokenRequest(body: Record<string, string>): Promise<TokenResponse> {
   const res = await fetch(`${API}/oauth/token/`, {
     method: "POST",
+    // TikTok rejects the ";charset=UTF-8" that fetch adds for URLSearchParams bodies,
+    // so send a string with an explicit content type.
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_key: process.env.TIKTOK_CLIENT_KEY!,
       client_secret: process.env.TIKTOK_CLIENT_SECRET!,
       ...body,
-    }),
+    }).toString(),
   });
   const json = (await res.json()) as TokenResponse;
   if (!res.ok || json.error) {
