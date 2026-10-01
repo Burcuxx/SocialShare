@@ -90,3 +90,19 @@ function open() {
 // Reuse one connection across hot reloads in dev.
 const g = globalThis as unknown as { db?: Database.Database };
 export const db = (g.db ??= open());
+
+export type JobStatus = "pending" | "downloading" | "processing" | "uploading" | "done" | "failed";
+
+export type Job = {
+  id: number;
+  video_id: number;
+  target_connection_id: number;
+  title: string | null;
+  caption: string | null;
+  status: JobStatus;
+  attempts: number;
+  error: string | null;
+  remote_id: string | null;
+  created_at: string;
+  updated_at: string;
+};

@@ -1,4 +1,5 @@
-import { db, type Account, type Connection, type Video } from "@/lib/db";
+import Link from "next/link";
+import { db, type Account, type Connection, type JobStatus, type Video } from "@/lib/db";
 import { createAccount, refreshVideos } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,12 @@ export default async function Home({
   const videos = db
     .prepare("SELECT * FROM videos ORDER BY published_at DESC")
     .all() as Video[];
+  const sent = db
+    .prepare(
+      `SELECT j.video_id, j.status, c.platform FROM jobs j
+       JOIN connections c ON c.id = j.target_connection_id`,
+    )
+    .all() as { video_id: number; status: JobStatus; platform: string }[];
 
   return (
     <>
@@ -55,7 +62,7 @@ export default async function Home({
                   </div>
                   <div className="grid">
                     {list.map((v) => (
-                      <div key={v.id} className="video">
+                      <Link key={v.id} href={`/videos/${v.id}`} className="video">
                         {v.thumbnail_url && <img src={v.thumbnail_url} alt="" loading="lazy" />}
                         <div className="body">
                           <p className="title">{v.title}</p>
@@ -64,8 +71,17 @@ export default async function Home({
                             {v.published_at &&
                               ` · ${new Date(v.published_at).toLocaleDateString("tr-TR")}`}
                           </span>
+                          <div className="badges">
+                            {sent
+                              .filter((j) => j.video_id === v.id)
+                              .map((j, i) => (
+                                <span key={`${j.platform}-${i}`} className={`badge ${j.status}`}>
+                                  {j.platform === "tiktok" ? "TikTok" : "Instagram"}
+                                </span>
+                              ))}
+                          </div>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { createJob, retryJob } from "@/lib/jobs";
 import { syncVideos } from "@/lib/youtube";
 
 export async function createAccount(formData: FormData) {
@@ -19,4 +20,19 @@ export async function refreshVideos(formData: FormData) {
     redirect(`/?error=${encodeURIComponent((e as Error).message)}`);
   }
   revalidatePath("/");
+}
+
+export async function sendVideo(formData: FormData) {
+  const videoId = Number(formData.get("videoId"));
+  for (const target of formData.getAll("target")) {
+    const connectionId = Number(target);
+    createJob(videoId, connectionId, String(formData.get(`caption-${connectionId}`) ?? "").replace(/\r\n/g, "\n"));
+  }
+  revalidatePath("/");
+  revalidatePath(`/videos/${videoId}`);
+}
+
+export async function retry(formData: FormData) {
+  retryJob(Number(formData.get("jobId")));
+  revalidatePath(`/videos/${formData.get("videoId")}`);
 }
