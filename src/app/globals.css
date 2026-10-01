@@ -261,6 +261,7 @@ input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--primary)
 .side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 16px; padding: 0 4px; }
 .lang { display: flex; flex-direction: column; gap: 8px; }
 .lang .side-label { padding: 0 8px; }
+.side-user .link-button { white-space: nowrap; flex-shrink: 0; }
 .side-user {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 12px 8px 0; border-top: 1px solid var(--side-line); font-size: 13px; color: #B9BBB4;
