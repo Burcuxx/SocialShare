@@ -1,5 +1,6 @@
 "use server";
 
+import fs from "node:fs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -11,7 +12,7 @@ import {
   startSession,
   verifyPassword,
 } from "@/lib/auth";
-import { db, type User } from "@/lib/db";
+import { db, type User, type Video } from "@/lib/db";
 import { isUploadPath } from "@/lib/files";
 import { createPost, retryJob } from "@/lib/jobs";
 import { isLocale, type ErrorCode } from "@/i18n";
@@ -75,6 +76,36 @@ export async function createAccount(formData: FormData) {
     .prepare("INSERT INTO accounts (user_id, name) VALUES (?, ?)")
     .run(user.id, name);
   redirect(`/accounts/${lastInsertRowid}`);
+}
+
+/**
+ * Deletes the account with its connections, videos, jobs and temp files.
+ * Posts already published on the platforms stay there.
+ */
+export async function deleteAccount(formData: FormData) {
+  const user = await requireUser();
+  const accountId = Number(formData.get("accountId"));
+  if (!ownAccount(user.id, accountId)) redirect("/");
+  const busy = db
+    .prepare(
+      `SELECT 1 FROM jobs j JOIN videos v ON v.id = j.video_id
+       WHERE v.account_id = ? AND j.status IN ('downloading', 'processing', 'uploading')`,
+    )
+    .get(accountId);
+  if (busy) redirect(`/accounts/${accountId}?error=accountBusy`);
+
+  const files = db
+    .prepare("SELECT file_path FROM videos WHERE account_id = ? AND file_path IS NOT NULL")
+    .all(accountId) as Pick<Video, "file_path">[];
+  db.transaction(() => {
+    db.prepare("DELETE FROM jobs WHERE video_id IN (SELECT id FROM videos WHERE account_id = ?)").run(accountId);
+    db.prepare("DELETE FROM videos WHERE account_id = ?").run(accountId);
+    db.prepare("DELETE FROM connections WHERE account_id = ?").run(accountId);
+    db.prepare("DELETE FROM accounts WHERE id = ?").run(accountId);
+  })();
+  for (const f of files) if (f.file_path) fs.rmSync(f.file_path, { force: true });
+  revalidatePath("/", "layout");
+  redirect("/");
 }
 
 export async function sendPost(formData: FormData) {

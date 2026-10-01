@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ownAccount, requireUser } from "@/lib/auth";
+import { resumeJobs } from "@/lib/reconnect";
 import { connect } from "@/lib/tiktok";
 
 export async function GET(request: NextRequest) {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
 
   try {
     await connect(accountId, code, verifier);
+    resumeJobs(accountId, "tiktok");
   } catch (e) {
     home.searchParams.set("error", (e as Error).message);
   }

@@ -12,6 +12,7 @@ import { ownAccount, requireUser } from "@/lib/auth";
 import { db, type Connection, type Job, type Video } from "@/lib/db";
 import { jobsForVideo } from "@/lib/jobs";
 import { PLATFORM_NAMES } from "@/lib/labels";
+import { needsReconnect } from "@/lib/reconnect";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,15 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             const conn = connections.find((c) => c.id === job.target_connection_id);
             if (!conn) return null;
             const active = job.status !== "done" && job.status !== "failed";
+            const reconnect = job.status !== "done" && needsReconnect(job.error) && (
+              <div className="reconnect" role="alert">
+                <strong>{t.post.reconnectTitle}</strong>
+                <span>{t.post.reconnectText}</span>
+                <a className="btn btn-sm" href={`/api/auth/${conn.platform}?accountId=${account.id}`}>
+                  {t.post.reconnectButton(PLATFORM_NAMES[conn.platform])}
+                </a>
+              </div>
+            );
             const step = stepOf(job);
             return (
               <article key={job.id} className={`card job${active ? " job-active" : ""}`}>
@@ -112,7 +122,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                         </li>
                       ))}
                     </ol>
-                    {job.error && <div className="alert">{job.error}</div>}
+                    {reconnect || (job.error && <div className="alert">{job.error}</div>)}
                     <span className="muted">{t.post.autoRefresh}</span>
                   </>
                 )}
@@ -137,7 +147,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
                 {job.status === "failed" && (
                   <>
-                    {job.error && <div className="alert">{job.error}</div>}
+                    {reconnect || (job.error && <div className="alert">{job.error}</div>)}
                     <form action={retry}>
                       <input type="hidden" name="jobId" value={job.id} />
                       <input type="hidden" name="videoId" value={video.id} />

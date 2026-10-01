@@ -26,6 +26,12 @@ export const tr = {
     connections: "Bağlı platformlar",
     connected: "Bağlı:",
     none: "Henüz bağlı platform yok.",
+    reconnect: "Yeniden bağla",
+    reconnectNeeded: "Yeniden bağlanmalı",
+    deleteTitle: "Hesabı sil",
+    deleteHint: "Bağlantılar, videolar ve gönderim geçmişi bu uygulamadan silinir. YouTube ve TikTok'ta yayınlanan videolar silinmez.",
+    deleteButton: "Hesabı sil",
+    deleteConfirm: (name: string) => `"${name}" hesabı silinsin mi? Bu işlem geri alınamaz.`,
   },
   newPost: {
     title: "Yeni video",
@@ -86,6 +92,9 @@ export const tr = {
     openVideo: "Videoyu aç",
     studio: "YouTube Studio",
     retry: "Tekrar dene",
+    reconnectTitle: "Bu platformu yeniden bağlaman gerekiyor",
+    reconnectText: "Uygulama yeni izinlere ihtiyaç duyuyor ya da oturumun süresi doldu. Yeniden bağladığında gönderim kendiliğinden devam eder.",
+    reconnectButton: (platform: string) => `${platform} hesabını yeniden bağla`,
     failedAttempts: (n: number) => `Hata · ${n} deneme`,
   },
   status: {
@@ -119,6 +128,7 @@ export const tr = {
     strengthLabel: "Şifre gücü",
   },
   errors: {
+    accountBusy: "Gönderim sürerken hesap silinemez. Bitince tekrar dene.",
     invalidEmail: "Geçerli bir e-posta gir.",
     shortPassword: "Şifre en az 8 karakter olmalı.",
     emailTaken: "Bu e-posta zaten kayıtlı. Giriş yap.",

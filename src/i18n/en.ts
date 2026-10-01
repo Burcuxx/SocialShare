@@ -26,6 +26,12 @@ export const en: Dict = {
     connections: "Connected platforms",
     connected: "Connected:",
     none: "No platforms connected yet.",
+    reconnect: "Reconnect",
+    reconnectNeeded: "Needs reconnecting",
+    deleteTitle: "Delete account",
+    deleteHint: "Connections, videos and send history are removed from this app. Videos already published on YouTube and TikTok stay there.",
+    deleteButton: "Delete account",
+    deleteConfirm: (name: string) => `Delete the account "${name}"? This can't be undone.`,
   },
   newPost: {
     title: "New video",
@@ -86,6 +92,9 @@ export const en: Dict = {
     openVideo: "Open video",
     studio: "YouTube Studio",
     retry: "Try again",
+    reconnectTitle: "Reconnect this platform",
+    reconnectText: "The app needs new permissions or your login expired. Once you reconnect, sending continues on its own.",
+    reconnectButton: (platform: string) => `Reconnect ${platform}`,
     failedAttempts: (n: number) => `Failed · ${n} ${plural(n, "attempt", "attempts")}`,
   },
   status: {
@@ -117,6 +126,7 @@ export const en: Dict = {
     strengthLabel: "Password strength",
   },
   errors: {
+    accountBusy: "The account can't be deleted while a video is being sent. Try again when it's done.",
     invalidEmail: "Enter a valid email.",
     shortPassword: "Password must be at least 8 characters.",
     emailTaken: "This email is already registered. Log in instead.",

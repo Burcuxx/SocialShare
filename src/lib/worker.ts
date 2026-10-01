@@ -42,16 +42,22 @@ function cleanup(videoId: number) {
     .prepare("SELECT COUNT(*) AS n FROM jobs WHERE video_id = ? AND status != 'done'")
     .get(videoId) as { n: number };
   if (open.n > 0) return;
-  const video = db.prepare("SELECT file_path FROM videos WHERE id = ?").get(videoId) as Video;
+  const video = db.prepare("SELECT file_path FROM videos WHERE id = ?").get(videoId) as
+    | Video
+    | undefined;
+  if (!video) return; // the account was deleted meanwhile
   if (video.file_path) fs.rmSync(video.file_path, { force: true });
   db.prepare("UPDATE videos SET file_path = NULL WHERE id = ?").run(videoId);
 }
 
 async function runJob(job: Job) {
-  const video = db.prepare("SELECT * FROM videos WHERE id = ?").get(job.video_id) as Video;
+  const video = db.prepare("SELECT * FROM videos WHERE id = ?").get(job.video_id) as
+    | Video
+    | undefined;
   const conn = db
     .prepare("SELECT * FROM connections WHERE id = ?")
-    .get(job.target_connection_id) as Connection;
+    .get(job.target_connection_id) as Connection | undefined;
+  if (!video || !conn) return; // the account was deleted meanwhile
 
   try {
     const upload = uploaders[conn.platform];
@@ -78,7 +84,8 @@ async function loop() {
   for (;;) {
     const job = nextJob();
     if (job) {
-      await runJob(job);
+      // One bad job must not stop the worker.
+      await runJob(job).catch((e) => console.error("Job failed unexpectedly:", e));
     } else {
       await new Promise((r) => setTimeout(r, POLL_MS));
     }

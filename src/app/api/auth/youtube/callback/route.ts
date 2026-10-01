@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ownAccount, requireUser } from "@/lib/auth";
+import { resumeJobs } from "@/lib/reconnect";
 import { connect } from "@/lib/youtube";
 
 export async function GET(request: NextRequest) {
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
 
   try {
     await connect(accountId, code);
+    resumeJobs(accountId, "youtube");
   } catch (e) {
     home.searchParams.set("error", (e as Error).message);
   }
