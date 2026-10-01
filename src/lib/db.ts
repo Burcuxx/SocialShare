@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS videos (
   description    TEXT,
   duration_sec   INTEGER,
   file_path      TEXT,
+  scheduled_at   TEXT,  -- UTC "YYYY-MM-DD HH:MM:SS"; NULL = send right away
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -88,6 +89,7 @@ export type Video = {
   description: string | null;
   duration_sec: number | null;
   file_path: string | null;
+  scheduled_at: string | null;
   created_at: string;
 };
 
@@ -119,6 +121,11 @@ function open() {
   if (!accountCols.some((c) => c.name === "user_id")) {
     db.exec("ALTER TABLE accounts ADD COLUMN user_id INTEGER REFERENCES users(id)");
   }
+  // v3: scheduled posts.
+  const videoCols = db.prepare("PRAGMA table_info(videos)").all() as { name: string }[];
+  if (!videoCols.some((c) => c.name === "scheduled_at")) {
+    db.exec("ALTER TABLE videos ADD COLUMN scheduled_at TEXT");
+  }
   return db;
 }
 
@@ -141,3 +148,13 @@ export type Job = {
   created_at: string;
   updated_at: string;
 };
+
+/** SQLite datetime format (UTC, no zone) for comparing with datetime('now'). */
+export function toDbDate(date: Date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+/** True while a video waits for its scheduled time. */
+export function isScheduled(video: Pick<Video, "scheduled_at">) {
+  return !!video.scheduled_at && video.scheduled_at > toDbDate(new Date());
+}

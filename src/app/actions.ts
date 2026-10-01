@@ -12,9 +12,9 @@ import {
   startSession,
   verifyPassword,
 } from "@/lib/auth";
-import { db, type User, type Video } from "@/lib/db";
+import { db, toDbDate, type User, type Video } from "@/lib/db";
 import { isUploadPath } from "@/lib/files";
-import { createPost, retryJob } from "@/lib/jobs";
+import { clearSchedule, createPost, retryJob } from "@/lib/jobs";
 import { isLocale, type ErrorCode } from "@/i18n";
 import { getT } from "@/i18n/server";
 
@@ -118,6 +118,9 @@ export async function sendPost(formData: FormData) {
   if (!isUploadPath(filePath) || !title) throw new Error(t.errors.missingVideo);
 
   const duration = Number(formData.get("durationSec"));
+  // The browser sends the picked local time as UTC ISO; a time in the past means "now".
+  const when = new Date(String(formData.get("scheduledAt") ?? ""));
+  const scheduledAt = !Number.isNaN(when.getTime()) && when.getTime() > Date.now() ? toDbDate(when) : null;
   const videoId = createPost({
     accountId,
     title,
@@ -125,6 +128,7 @@ export async function sendPost(formData: FormData) {
     durationSec: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
     filePath,
     targetIds: formData.getAll("target").map(Number),
+    scheduledAt,
   });
   redirect(`/posts/${videoId}`);
 }
@@ -142,4 +146,14 @@ export async function retry(formData: FormData) {
     .get(jobId, user.id);
   if (owned) retryJob(jobId);
   revalidatePath(`/posts/${formData.get("videoId")}`);
+}
+
+export async function sendNow(formData: FormData) {
+  const user = await requireUser();
+  const videoId = Number(formData.get("videoId"));
+  const video = db.prepare("SELECT account_id FROM videos WHERE id = ?").get(videoId) as
+    | Pick<Video, "account_id">
+    | undefined;
+  if (video && ownAccount(user.id, video.account_id)) clearSchedule(videoId);
+  revalidatePath(`/posts/${videoId}`);
 }

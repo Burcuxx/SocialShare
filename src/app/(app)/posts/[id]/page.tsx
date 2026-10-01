@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { retry } from "@/app/actions";
+import { retry, sendNow } from "@/app/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { CopyButton } from "@/components/copy-button";
 import { ChevronLeft, Retry } from "@/components/icons";
 import { PlatformMark } from "@/components/platform-mark";
 import { StatusChip } from "@/components/status-chip";
@@ -9,10 +10,11 @@ import { VideoThumb } from "@/components/video-thumb";
 import { formatDate, formatDuration } from "@/i18n";
 import { getT } from "@/i18n/server";
 import { ownAccount, requireUser } from "@/lib/auth";
-import { db, type Connection, type Job, type Video } from "@/lib/db";
+import { db, isScheduled, type Connection, type Job, type Video } from "@/lib/db";
 import { jobsForVideo } from "@/lib/jobs";
 import { PLATFORM_NAMES } from "@/lib/labels";
 import { needsReconnect } from "@/lib/reconnect";
+import { DRAFT_PREFIX } from "@/lib/tiktok";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +37,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const connections = db
     .prepare("SELECT * FROM connections WHERE account_id = ?")
     .all(video.account_id) as Connection[];
-  const running = jobs.some((j) => j.status !== "done" && j.status !== "failed");
+  const scheduled = isScheduled(video);
+  const running = !scheduled && jobs.some((j) => j.status !== "done" && j.status !== "failed");
   const doneCount = jobs.filter((j) => j.status === "done").length;
   const dur = formatDuration(video.duration_sec);
   const steps = [t.post.stepQueued, t.post.stepUploading, t.post.stepSent];
@@ -77,10 +80,22 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             </span>
           </div>
 
+          {scheduled && (
+            <div className="card scheduled">
+              <strong>{t.post.scheduledTitle(formatDate(video.scheduled_at!, locale))}</strong>
+              <span className="muted">{t.post.scheduledText}</span>
+              <form action={sendNow}>
+                <input type="hidden" name="videoId" value={video.id} />
+                <button className="btn btn-sm">{t.post.sendNow}</button>
+              </form>
+            </div>
+          )}
+
           {jobs.map((job) => {
             const conn = connections.find((c) => c.id === job.target_connection_id);
             if (!conn) return null;
-            const active = job.status !== "done" && job.status !== "failed";
+            const waiting = scheduled && job.status === "pending";
+            const active = !waiting && job.status !== "done" && job.status !== "failed";
             const reconnect = job.status !== "done" && needsReconnect(job.error) && (
               <div className="reconnect" role="alert">
                 <strong>{t.post.reconnectTitle}</strong>
@@ -100,7 +115,9 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                     <span className="muted ellipsis">{conn.display_name}</span>
                   </span>
                   <StatusChip status={job.status}>
-                    {job.status === "failed"
+                    {waiting
+                      ? t.videos.filters.scheduled
+                      : job.status === "failed"
                       ? t.post.failedAttempts(job.attempts)
                       : job.status === "done"
                         ? `✓ ${t.status.done}`
@@ -129,7 +146,18 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
                 {job.status === "done" && (
                   <>
-                    <div className="note">{t.post.done[conn.platform]}</div>
+                    {job.remote_id?.startsWith(DRAFT_PREFIX) ? (
+                      <>
+                        <div className="note">{t.post.draftNote}</div>
+                        {job.caption && (
+                          <div className="row">
+                            <CopyButton text={job.caption} />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="note">{t.post.done[conn.platform]}</div>
+                    )}
                     {conn.platform === "youtube" && (
                       <div className="row">
                         {job.remote_id && (

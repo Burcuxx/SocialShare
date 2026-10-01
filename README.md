@@ -45,7 +45,11 @@ Uploads use the `youtube.upload` scope. Until the Google project passes the YouT
 5. Use **Sandbox** mode and add your TikTok accounts as target users (no app review needed).
 6. Put the client key and secret into `.env`.
 
-Videos are posted directly with their caption (Direct Post). Until TikTok audits the app, posts are forced to "only me"; change the visibility in TikTok afterwards. Once the app is audited, posts go out public automatically.
+Videos are posted directly with their caption (Direct Post). Until TikTok audits the app, Direct Post only works for private accounts (as "only me"); for public accounts the app falls back to sending a draft to the TikTok inbox and offers a "copy caption" button. Scopes: `user.info.basic`, `video.publish`, `video.upload`. Once the app is audited, posts go out public automatically.
+
+## Scheduling
+
+A video can be sent right away or scheduled for a date and time. The app sends it itself, so the computer and the app must be running then; if they aren't, it's sent as soon as they are.
 
 ## How sending works
 

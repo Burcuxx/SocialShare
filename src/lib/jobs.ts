@@ -7,6 +7,8 @@ type NewPost = {
   durationSec: number | null;
   filePath: string;
   targetIds: number[];
+  /** UTC "YYYY-MM-DD HH:MM:SS", or null to send right away. */
+  scheduledAt: string | null;
 };
 
 /**
@@ -24,10 +26,10 @@ export function createPost(post: NewPost) {
   return db.transaction(() => {
     const { lastInsertRowid } = db
       .prepare(
-        `INSERT INTO videos (account_id, title, description, duration_sec, file_path)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO videos (account_id, title, description, duration_sec, file_path, scheduled_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(post.accountId, post.title, post.description, post.durationSec, post.filePath);
+      .run(post.accountId, post.title, post.description, post.durationSec, post.filePath, post.scheduledAt);
     const insertJob = db.prepare(
       "INSERT INTO jobs (video_id, target_connection_id, title, caption) VALUES (?, ?, ?, ?)",
     );
@@ -52,4 +54,9 @@ export function retryJob(jobId: number) {
 
 export function jobsForVideo(videoId: number) {
   return db.prepare("SELECT * FROM jobs WHERE video_id = ?").all(videoId) as Job[];
+}
+
+/** "Send now" for a scheduled video. */
+export function clearSchedule(videoId: number) {
+  db.prepare("UPDATE videos SET scheduled_at = NULL WHERE id = ?").run(videoId);
 }

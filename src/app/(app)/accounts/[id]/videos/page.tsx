@@ -7,20 +7,21 @@ import { VideoThumb } from "@/components/video-thumb";
 import { formatDate } from "@/i18n";
 import { getT } from "@/i18n/server";
 import { ownAccount, requireUser } from "@/lib/auth";
-import { db, type JobStatus, type Platform, type Video } from "@/lib/db";
+import { db, isScheduled, type JobStatus, type Platform, type Video } from "@/lib/db";
 import { PLATFORM_NAMES } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 
 const PAGE = 20;
-const FILTERS = ["all", "processing", "completed", "failed"] as const;
+const FILTERS = ["all", "scheduled", "processing", "completed", "failed"] as const;
 type Filter = (typeof FILTERS)[number];
 
 type Row = Video & { total: number; done: number; failed: number };
 
-/** Any failed job → failed; every job done → completed; otherwise processing. */
+/** Any failed job → failed; waiting for its time → scheduled; every job done → completed; else processing. */
 function category(v: Row): Exclude<Filter, "all"> {
   if (v.failed > 0) return "failed";
+  if (isScheduled(v)) return "scheduled";
   if (v.done === v.total) return "completed";
   return "processing";
 }
@@ -53,7 +54,7 @@ export default async function VideosPage({
        GROUP BY v.id ORDER BY v.id DESC`,
     )
     .all(account.id, `%${q}%`) as Row[];
-  const counts = { all: rows.length, processing: 0, completed: 0, failed: 0 };
+  const counts = { all: rows.length, scheduled: 0, processing: 0, completed: 0, failed: 0 };
   for (const r of rows) counts[category(r)]++;
   const filtered = filter === "all" ? rows : rows.filter((r) => category(r) === filter);
   const shown = filtered.slice(0, limit);
@@ -119,13 +120,15 @@ export default async function VideosPage({
                 <strong className="ellipsis">{v.title}</strong>
                 {v.description && <span className="muted ellipsis">{v.description.split("\n")[0]}</span>}
               </span>
-              <span className="muted list-wide">{formatDate(v.created_at, locale)}</span>
+              <span className="muted list-wide">{formatDate(v.scheduled_at ?? v.created_at, locale)}</span>
               <span className="badges list-wide">
                 {jobs
                   .filter((j) => j.video_id === v.id)
                   .map((j, i) => (
                     <StatusChip key={i} status={j.status}>
-                      {t.chip(j.status, PLATFORM_NAMES[j.platform])}
+                      {j.status === "pending" && isScheduled(v)
+                        ? t.scheduledChip(PLATFORM_NAMES[j.platform])
+                        : t.chip(j.status, PLATFORM_NAMES[j.platform])}
                     </StatusChip>
                   ))}
               </span>

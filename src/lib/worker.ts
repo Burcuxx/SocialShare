@@ -24,14 +24,15 @@ function setStatus(jobId: number, status: Job["status"], extra: Partial<Job> = {
   });
 }
 
-/** Oldest pending job whose retry delay (1 min per attempt) has passed. */
+/** Oldest pending job whose retry delay (1 min per attempt) and scheduled time have passed. */
 function nextJob() {
   return db
     .prepare(
-      `SELECT * FROM jobs
-       WHERE status = 'pending'
-         AND updated_at <= datetime('now', '-' || (attempts * 60) || ' seconds')
-       ORDER BY id LIMIT 1`,
+      `SELECT j.* FROM jobs j JOIN videos v ON v.id = j.video_id
+       WHERE j.status = 'pending'
+         AND j.updated_at <= datetime('now', '-' || (j.attempts * 60) || ' seconds')
+         AND (v.scheduled_at IS NULL OR v.scheduled_at <= datetime('now'))
+       ORDER BY j.id LIMIT 1`,
     )
     .get() as Job | undefined;
 }

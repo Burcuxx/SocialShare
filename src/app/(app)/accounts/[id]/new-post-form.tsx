@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sendPost } from "@/app/actions";
+import { EmojiPicker } from "@/components/emoji-picker";
 import { ArrowRight, Close, Info, Upload } from "@/components/icons";
 import { PlatformMark } from "@/components/platform-mark";
 import { formatDuration } from "@/i18n";
@@ -39,6 +40,13 @@ function upload(file: File, onProgress: (pct: number) => void) {
   });
 }
 
+/** "YYYY-MM-DDTHH:MM" in local time, for datetime-local's min. */
+function localNow() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
 function Counter({ value, max }: { value: number; max: number }) {
   const level = value > max ? " over" : value >= max * 0.9 ? " near" : "";
   return (
@@ -59,6 +67,29 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [mode, setMode] = useState<"now" | "schedule">("now");
+  const [when, setWhen] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Inserts text at the cursor (or the end) and keeps the cursor after it. */
+  function insertAt(
+    el: HTMLInputElement | HTMLTextAreaElement | null,
+    value: string,
+    set: (v: string) => void,
+    max: number,
+    text: string,
+  ) {
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    const next = value.slice(0, start) + text + value.slice(end);
+    if (next.length > max) return;
+    set(next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + text.length, start + text.length);
+    });
+  }
 
   // Local preview of the picked file; released when the file changes.
   useEffect(() => {
@@ -69,7 +100,9 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
   }, [file]);
 
   const busy = progress !== null;
-  const canSend = !!file && title.trim() !== "" && selected.size > 0 && !busy;
+  const whenDate = mode === "schedule" && when ? new Date(when) : null;
+  const scheduleOk = mode === "now" || (!!whenDate && whenDate.getTime() > Date.now());
+  const canSend = !!file && title.trim() !== "" && selected.size > 0 && scheduleOk && !busy;
   const missing = PLATFORMS.filter((p) => !targets.some((x) => x.platform === p));
 
   function pick(f: File | undefined) {
@@ -100,6 +133,7 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
       fd.set("title", title);
       fd.set("description", description);
       selected.forEach((id) => fd.append("target", String(id)));
+      if (whenDate) fd.set("scheduledAt", whenDate.toISOString());
       await sendPost(fd);
     } catch {
       setError(t.newPost.uploadFailed);
@@ -165,9 +199,13 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
         <label className="field">
           <span className="field-label">
             {t.newPost.fieldTitle}
-            <Counter value={title.length} max={TITLE_MAX} />
+            <span className="field-tools">
+              <EmojiPicker onPick={(e) => insertAt(titleRef.current, title, setTitle, TITLE_MAX, e)} />
+              <Counter value={title.length} max={TITLE_MAX} />
+            </span>
           </span>
           <input
+            ref={titleRef}
             type="text"
             value={title}
             maxLength={TITLE_MAX}
@@ -178,9 +216,15 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
         <label className="field">
           <span className="field-label">
             {t.newPost.fieldDescription}
-            <Counter value={description.length} max={DESCRIPTION_MAX} />
+            <span className="field-tools">
+              <EmojiPicker
+                onPick={(e) => insertAt(descriptionRef.current, description, setDescription, DESCRIPTION_MAX, e)}
+              />
+              <Counter value={description.length} max={DESCRIPTION_MAX} />
+            </span>
           </span>
           <textarea
+            ref={descriptionRef}
             rows={5}
             value={description}
             maxLength={DESCRIPTION_MAX}
@@ -237,6 +281,40 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
 
         {error && <div className="alert" role="alert">{error}</div>}
 
+        {targets.length > 0 && (
+          <fieldset className="card when">
+            <legend className="field-label">{t.newPost.when}</legend>
+            <div className="segment" role="radiogroup" aria-label={t.newPost.when}>
+              {(["now", "schedule"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m}
+                  aria-current={mode === m ? "page" : undefined}
+                  onClick={() => setMode(m)}
+                  disabled={busy}
+                >
+                  {m === "now" ? t.newPost.now : t.newPost.schedule}
+                </button>
+              ))}
+            </div>
+            {mode === "schedule" && (
+              <label className="field">
+                <span className="field-label">{t.newPost.scheduleLabel}</span>
+                <input
+                  type="datetime-local"
+                  value={when}
+                  min={localNow()}
+                  onChange={(e) => setWhen(e.target.value)}
+                  required
+                />
+                <span className="muted small">{t.newPost.scheduleHint}</span>
+              </label>
+            )}
+          </fieldset>
+        )}
+
         <div className="send-bar">
           {busy && (
             <div className="progress" aria-hidden="true">
@@ -248,7 +326,9 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
               ? progress! < 100
                 ? t.newPost.uploadingPct(progress!)
                 : t.newPost.sending
-              : t.newPost.send(selected.size)}
+              : mode === "schedule"
+                ? t.newPost.scheduleButton(selected.size)
+                : t.newPost.send(selected.size)}
             {!busy && <ArrowRight />}
           </button>
         </div>
