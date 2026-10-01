@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import { db, type Connection } from "./db";
+import { mimeType } from "./files";
 
 const API = "https://open.tiktokapis.com/v2";
 const SCOPE = "user.info.basic,video.publish";
@@ -206,7 +207,7 @@ async function uploadAndWait(
       const res = await fetch(init.upload_url, {
         method: "PUT",
         headers: {
-          "Content-Type": "video/mp4",
+          "Content-Type": mimeType(filePath),
           "Content-Range": `bytes ${start}-${end}/${size}`,
         },
         body: chunk,

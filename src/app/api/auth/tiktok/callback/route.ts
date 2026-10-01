@@ -6,7 +6,8 @@ export async function GET(request: NextRequest) {
   const state = params.get("state");
   const code = params.get("code");
   const verifier = request.cookies.get("tiktok_verifier")?.value;
-  const home = new URL("/", process.env.APP_URL);
+  const accountId = Number(state?.split(".")[0]);
+  const home = new URL(accountId ? `/accounts/${accountId}` : "/", process.env.APP_URL);
 
   if (!code || !state || !verifier || state !== request.cookies.get("oauth_state")?.value) {
     home.searchParams.set("error", params.get("error_description") ?? "OAuth state mismatch");
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    await connect(Number(state.split(".")[0]), code, verifier);
+    await connect(accountId, code, verifier);
   } catch (e) {
     home.searchParams.set("error", (e as Error).message);
   }

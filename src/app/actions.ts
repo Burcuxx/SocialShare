@@ -3,36 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { createJob, retryJob } from "@/lib/jobs";
-import { syncVideos } from "@/lib/youtube";
+import { isUploadPath } from "@/lib/files";
+import { createPost, retryJob } from "@/lib/jobs";
 
 export async function createAccount(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
-  db.prepare("INSERT INTO accounts (name) VALUES (?)").run(name);
-  revalidatePath("/");
+  const { lastInsertRowid } = db.prepare("INSERT INTO accounts (name) VALUES (?)").run(name);
+  redirect(`/accounts/${lastInsertRowid}`);
 }
 
-export async function refreshVideos(formData: FormData) {
-  try {
-    await syncVideos(Number(formData.get("connectionId")));
-  } catch (e) {
-    redirect(`/?error=${encodeURIComponent((e as Error).message)}`);
-  }
-  revalidatePath("/");
-}
+export async function sendPost(formData: FormData) {
+  const filePath = String(formData.get("filePath") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!isUploadPath(filePath) || !title) throw new Error("Video veya başlık eksik");
 
-export async function sendVideo(formData: FormData) {
-  const videoId = Number(formData.get("videoId"));
-  for (const target of formData.getAll("target")) {
-    const connectionId = Number(target);
-    createJob(videoId, connectionId, String(formData.get(`caption-${connectionId}`) ?? "").replace(/\r\n/g, "\n"));
-  }
-  revalidatePath("/");
-  revalidatePath(`/videos/${videoId}`);
+  const duration = Number(formData.get("durationSec"));
+  const videoId = createPost({
+    accountId: Number(formData.get("accountId")),
+    title,
+    description: String(formData.get("description") ?? "").replace(/\r\n/g, "\n").trim(),
+    durationSec: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
+    filePath,
+    targetIds: formData.getAll("target").map(Number),
+  });
+  redirect(`/posts/${videoId}`);
 }
 
 export async function retry(formData: FormData) {
   retryJob(Number(formData.get("jobId")));
-  revalidatePath(`/videos/${formData.get("videoId")}`);
+  revalidatePath(`/posts/${formData.get("videoId")}`);
 }

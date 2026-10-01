@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { db, type Connection, type Job, type Video } from "./db";
-import { downloadVideo } from "./download";
 import * as tiktok from "./tiktok";
+import * as youtube from "./youtube";
 
 const MAX_ATTEMPTS = 3;
 const POLL_MS = 5000;
@@ -9,6 +9,8 @@ const POLL_MS = 5000;
 type Uploader = (conn: Connection, filePath: string, job: Job, video: Video) => Promise<string>;
 
 const uploaders: Partial<Record<Connection["platform"], Uploader>> = {
+  youtube: (conn, filePath, job) =>
+    youtube.uploadVideo(conn, filePath, job.title ?? "", job.caption ?? ""),
   tiktok: (conn, filePath, job, video) =>
     tiktok.publishVideo(conn, filePath, job.caption ?? "", video.duration_sec),
 };
@@ -34,22 +36,12 @@ function nextJob() {
     .get() as Job | undefined;
 }
 
-async function ensureFile(video: Video) {
-  if (video.file_path && fs.existsSync(video.file_path)) return video.file_path;
-  const filePath = await downloadVideo(video.youtube_id);
-  db.prepare("UPDATE videos SET file_path = ? WHERE id = ?").run(filePath, video.id);
-  return filePath;
-}
-
-/** Deletes the temp file once no job for the video is still in progress. */
+/** Deletes the temp file once every job for the video is done (failed ones may be retried). */
 function cleanup(videoId: number) {
-  const active = db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM jobs
-       WHERE video_id = ? AND status IN ('pending','downloading','processing','uploading')`,
-    )
+  const open = db
+    .prepare("SELECT COUNT(*) AS n FROM jobs WHERE video_id = ? AND status != 'done'")
     .get(videoId) as { n: number };
-  if (active.n > 0) return;
+  if (open.n > 0) return;
   const video = db.prepare("SELECT file_path FROM videos WHERE id = ?").get(videoId) as Video;
   if (video.file_path) fs.rmSync(video.file_path, { force: true });
   db.prepare("UPDATE videos SET file_path = NULL WHERE id = ?").run(videoId);
@@ -65,8 +57,8 @@ async function runJob(job: Job) {
     const upload = uploaders[conn.platform];
     if (!upload) throw new Error(`${conn.platform} gönderimi henüz desteklenmiyor`);
 
-    setStatus(job.id, "downloading");
-    const filePath = await ensureFile(video);
+    const filePath = video.file_path;
+    if (!filePath || !fs.existsSync(filePath)) throw new Error("Video dosyası bulunamadı");
 
     setStatus(job.id, "uploading");
     const remoteId = await upload(conn, filePath, job, video);
