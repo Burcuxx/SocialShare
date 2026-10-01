@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db, type Connection, type JobStatus, type Video } from "@/lib/db";
+import { DOWNLOAD_ERROR } from "@/lib/download";
 import { jobsForVideo } from "@/lib/jobs";
 import { retry, sendVideo } from "../../actions";
+import { AutoRefresh } from "./auto-refresh";
 import { CopyButton } from "./copy-button";
+import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
 
@@ -43,14 +46,21 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
     .join("\n\n")
     .slice(0, MAX_CAPTION);
   const newTargets = targets.filter((t) => !jobs.some((j) => j.target_connection_id === t.id));
+  const running = jobs.some((j) => j.status !== "done" && j.status !== "failed");
+  const downloadFailed = jobs.some(
+    (j) => j.status !== "done" && j.error?.startsWith(DOWNLOAD_ERROR),
+  );
 
   return (
     <>
+      {running && <AutoRefresh />}
       <Link href="/">← Videolar</Link>
       <div className="video-header">
         {video.thumbnail_url && <img src={video.thumbnail_url} alt="" />}
         <h1>{video.title}</h1>
       </div>
+
+      {downloadFailed && <UploadForm videoId={video.id} />}
 
       {targets.length === 0 && (
         <p className="muted">Bu hesaba bağlı TikTok veya Instagram yok.</p>
@@ -89,7 +99,13 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
               </>
             )}
 
-            {job?.error && <p className="error">{job.error}</p>}
+            {job?.error && job.status !== "done" && <p className="error">{job.error}</p>}
+            {job?.status === "done" && t.platform === "tiktok" && (
+              <p className="muted">
+                Taslak TikTok'ta hazır. TikTok uygulamasındaki bildirime dokunup metni yapıştır ve
+                paylaş.
+              </p>
+            )}
             {job && (
               <div className="row" style={{ marginTop: 10 }}>
                 {job.status === "failed" && (

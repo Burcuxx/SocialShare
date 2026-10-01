@@ -42,10 +42,21 @@ export default async function Home({
           <section key={account.id} className="account">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <h2>{account.name}</h2>
-              <a className="button" href={`/api/auth/youtube?accountId=${account.id}`}>
-                + YouTube bağla
-              </a>
+              <div className="row">
+                <a className="button" href={`/api/auth/youtube?accountId=${account.id}`}>
+                  + YouTube
+                </a>
+                <a className="button" href={`/api/auth/tiktok?accountId=${account.id}`}>
+                  + TikTok
+                </a>
+              </div>
             </div>
+            <p className="muted">
+              {connections
+                .filter((c) => c.account_id === account.id && c.platform !== "youtube")
+                .map((c) => `${c.platform === "tiktok" ? "TikTok" : "Instagram"}: ${c.display_name}`)
+                .join(" · ") || "TikTok/Instagram bağlı değil."}
+            </p>
             {youtube.length === 0 && <p className="muted">Bağlı YouTube kanalı yok.</p>}
 
             {youtube.map((conn) => {
