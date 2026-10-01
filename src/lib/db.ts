@@ -21,16 +21,15 @@ CREATE TABLE IF NOT EXISTS connections (
   UNIQUE (platform, external_id)
 );
 
+-- A video I upload once and send to several platforms.
 CREATE TABLE IF NOT EXISTS videos (
   id             INTEGER PRIMARY KEY,
-  connection_id  INTEGER NOT NULL REFERENCES connections(id),
-  youtube_id     TEXT NOT NULL UNIQUE,
+  account_id     INTEGER NOT NULL REFERENCES accounts(id),
   title          TEXT NOT NULL,
   description    TEXT,
-  thumbnail_url  TEXT,
   duration_sec   INTEGER,
-  published_at   TEXT,
-  file_path      TEXT
+  file_path      TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
@@ -67,15 +66,27 @@ export type Connection = {
 
 export type Video = {
   id: number;
-  connection_id: number;
-  youtube_id: string;
+  account_id: number;
   title: string;
   description: string | null;
-  thumbnail_url: string | null;
   duration_sec: number | null;
-  published_at: string | null;
   file_path: string | null;
+  created_at: string;
 };
+
+/**
+ * v1: videos used to be a cache of YouTube uploads (youtube_id column).
+ * Now they are files uploaded to this app. The old rows can't be converted,
+ * so drop videos and jobs; accounts and connections are kept.
+ */
+function migrate(db: Database.Database) {
+  if (db.pragma("user_version", { simple: true }) !== 0) return;
+  const cols = db.prepare("PRAGMA table_info(videos)").all() as { name: string }[];
+  if (cols.some((c) => c.name === "youtube_id")) {
+    db.exec("DROP TABLE IF EXISTS jobs; DROP TABLE IF EXISTS videos;");
+  }
+  db.pragma("user_version = 1");
+}
 
 function open() {
   const dbPath = process.env.DATABASE_PATH ?? "./data/social-share.db";
@@ -83,6 +94,7 @@ function open() {
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+  migrate(db);
   db.exec(SCHEMA);
   return db;
 }

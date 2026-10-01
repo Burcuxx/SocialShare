@@ -1,8 +1,13 @@
+import fs from "node:fs/promises";
 import { db, type Connection } from "./db";
+import { mimeType } from "./files";
 
 const API = "https://www.googleapis.com/youtube/v3";
-const SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
-const MAX_VIDEOS = 500;
+// readonly: read the channel name on connect; upload: post videos.
+const SCOPE = [
+  "https://www.googleapis.com/auth/youtube.readonly",
+  "https://www.googleapis.com/auth/youtube.upload",
+].join(" ");
 
 function redirectUri() {
   return `${process.env.APP_URL}/api/auth/youtube/callback`;
@@ -111,96 +116,49 @@ async function accessToken(conn: Connection) {
   return token.access_token;
 }
 
-type PlaylistItems = {
-  nextPageToken?: string;
-  items: {
-    snippet: {
-      title: string;
-      description: string;
-      thumbnails: Record<string, { url: string }>;
-    };
-    contentDetails: { videoId: string; videoPublishedAt?: string };
-  }[];
-};
-
-type VideoList = { items: { id: string; contentDetails: { duration: string } }[] };
-
-/** "PT1H2M3S" -> 3723 */
-function parseDuration(iso: string) {
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!m) return null;
-  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0);
-}
-
 /**
- * Pulls the channel's uploads into the videos table.
- * Quota: 1 unit per 50 videos for playlistItems + 1 per 50 for durations,
- * instead of 100 per call for search.list.
+ * Uploads the video (resumable upload, single request) and returns the YouTube video id.
+ * Until the Google project passes the YouTube API audit, YouTube forces these to private.
  */
-export async function syncVideos(connectionId: number) {
-  const conn = db.prepare("SELECT * FROM connections WHERE id = ?").get(connectionId) as
-    | Connection
-    | undefined;
-  if (!conn || conn.platform !== "youtube") throw new Error("YouTube connection not found");
+export async function uploadVideo(
+  conn: Connection,
+  filePath: string,
+  title: string,
+  description: string,
+) {
   const token = await accessToken(conn);
+  const file = await fs.readFile(filePath);
+  const type = mimeType(filePath);
 
-  const channels = await get<ChannelList>("channels", token, {
-    part: "contentDetails",
-    id: conn.external_id,
-  });
-  const uploads = channels.items?.[0]?.contentDetails.relatedPlaylists.uploads;
-  if (!uploads) throw new Error("Uploads playlist not found");
-
-  const upsert = db.prepare(
-    `INSERT INTO videos (connection_id, youtube_id, title, description, thumbnail_url, duration_sec, published_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (youtube_id) DO UPDATE SET
-       title = excluded.title,
-       description = excluded.description,
-       thumbnail_url = excluded.thumbnail_url,
-       duration_sec = excluded.duration_sec,
-       published_at = excluded.published_at`,
+  const init = await fetch(
+    "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Length": String(file.length),
+        "X-Upload-Content-Type": type,
+      },
+      body: JSON.stringify({
+        snippet: {
+          // YouTube: title max 100 chars, no angle brackets; description max 5000.
+          title: title.replace(/[<>]/g, "").slice(0, 100) || "Video",
+          description: description.replace(/[<>]/g, "").slice(0, 5000),
+        },
+        status: { privacyStatus: "public", selfDeclaredMadeForKids: false },
+      }),
+    },
   );
+  const location = init.headers.get("location");
+  if (!init.ok || !location) throw new Error(`YouTube upload init error: ${await init.text()}`);
 
-  let pageToken: string | undefined;
-  let count = 0;
-  do {
-    const page = await get<PlaylistItems>("playlistItems", token, {
-      part: "snippet,contentDetails",
-      playlistId: uploads,
-      maxResults: "50",
-      ...(pageToken ? { pageToken } : {}),
-    });
-
-    const ids = page.items.map((i) => i.contentDetails.videoId);
-    const durations = new Map<string, number | null>();
-    if (ids.length) {
-      const details = await get<VideoList>("videos", token, {
-        part: "contentDetails",
-        id: ids.join(","),
-      });
-      for (const v of details.items) durations.set(v.id, parseDuration(v.contentDetails.duration));
-    }
-
-    db.transaction(() => {
-      for (const item of page.items) {
-        const id = item.contentDetails.videoId;
-        // Private/deleted videos have no details; skip them.
-        if (!durations.has(id)) continue;
-        const thumbs = item.snippet.thumbnails;
-        upsert.run(
-          conn.id,
-          id,
-          item.snippet.title,
-          item.snippet.description,
-          (thumbs.medium ?? thumbs.high ?? thumbs.default)?.url ?? null,
-          durations.get(id),
-          item.contentDetails.videoPublishedAt ?? null,
-        );
-      }
-    })();
-
-    count += page.items.length;
-    pageToken = page.nextPageToken;
-  } while (pageToken && count < MAX_VIDEOS);
+  const res = await fetch(location, {
+    method: "PUT",
+    headers: { "Content-Type": type },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`YouTube upload error: ${await res.text()}`);
+  const video = (await res.json()) as { id: string };
+  return video.id;
 }

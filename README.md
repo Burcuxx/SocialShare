@@ -1,15 +1,14 @@
 # Social Share
 
-Lists the videos on my YouTube channels and sends a selected video to TikTok and Instagram (Reels) with one click. Runs locally.
+Upload a video once, write the title and description, and send it to YouTube, TikTok and Instagram (Reels) at the same time. Runs locally.
 
 ## Stack
 
-Next.js + React + TypeScript, Node.js, SQLite, ffmpeg, yt-dlp. No separate backend, no Redis, no external queue.
+Next.js + React + TypeScript, Node.js, SQLite. No separate backend, no Redis, no external queue.
 
 ## Requirements
 
 - Node.js 22+
-- ffmpeg and yt-dlp on `PATH` (macOS: `brew install yt-dlp ffmpeg`)
 
 ## Setup
 
@@ -31,7 +30,7 @@ Tokens and API keys live only in `.env` (gitignored). The SQLite database (`data
 
 Google only accepts `localhost` (or a public domain) as a redirect, so connect accounts from the computer at `http://localhost:3000`. After that the app works from your phone too.
 
-Video lists are cached in SQLite and only re-fetched when you press **Yenile** (about 2 quota units per 50 videos).
+Uploads use the `youtube.upload` scope. Until the Google project passes the YouTube API audit, YouTube forces API uploads to private; switch them to public in YouTube Studio. Quota: 100 uploads per day.
 
 ## TikTok setup
 
@@ -46,4 +45,4 @@ Videos are posted directly with their caption (Direct Post). Until TikTok audits
 
 ## How sending works
 
-A background worker starts with the server (`src/instrumentation.ts`) and processes jobs one at a time from the `jobs` table: download with yt-dlp → upload → done. Failed attempts are retried up to 3 times; after that the job shows a manual retry button. Jobs interrupted by a shutdown resume on the next start. If yt-dlp can't download a video, the video page offers a file upload instead. The temp file is deleted once all jobs for the video are finished.
+A background worker starts with the server (`src/instrumentation.ts`) and processes jobs one at a time from the `jobs` table. You upload a video once (title + description) and pick the platforms; each platform gets its own job. Failed attempts are retried up to 3 times; after that the job shows a manual retry button. Jobs interrupted by a shutdown resume on the next start. The uploaded file stays in `tmp/` until every job for it is done.
