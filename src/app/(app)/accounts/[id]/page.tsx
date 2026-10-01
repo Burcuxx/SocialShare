@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db, type Account, type Connection, type JobStatus, type Video } from "@/lib/db";
+import { ownAccount, requireUser } from "@/lib/auth";
+import { db, type Connection, type JobStatus, type Video } from "@/lib/db";
 import { PLATFORM_NAMES } from "@/lib/labels";
 import { NewPostForm } from "./new-post-form";
 
@@ -13,11 +14,10 @@ export default async function AccountPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  const user = await requireUser();
   const { id } = await params;
   const { error } = await searchParams;
-  const account = db.prepare("SELECT * FROM accounts WHERE id = ?").get(Number(id)) as
-    | Account
-    | undefined;
+  const account = ownAccount(user.id, Number(id));
   if (!account) notFound();
 
   const connections = db

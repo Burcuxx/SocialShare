@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { ownAccount, requireUser } from "@/lib/auth";
 import { db, type Connection, type Video } from "@/lib/db";
 import { jobsForVideo } from "@/lib/jobs";
 import { PLATFORM_NAMES, STATUS_LABELS } from "@/lib/labels";
-import { retry } from "../../actions";
+import { retry } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,12 @@ function doneNote(platform: Connection["platform"], remoteId: string | null) {
 }
 
 export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
   const { id } = await params;
   const video = db.prepare("SELECT * FROM videos WHERE id = ?").get(Number(id)) as
     | Video
     | undefined;
-  if (!video) notFound();
+  if (!video || !ownAccount(user.id, video.account_id)) notFound();
 
   const jobs = jobsForVideo(video.id);
   const connections = db

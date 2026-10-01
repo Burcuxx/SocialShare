@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { ownAccount, requireUser } from "@/lib/auth";
 import { authUrl } from "@/lib/youtube";
 
 // GET /api/auth/youtube?accountId=1 -> Google consent screen
 export async function GET(request: NextRequest) {
+  const user = await requireUser();
   const accountId = request.nextUrl.searchParams.get("accountId");
-  if (!accountId) return NextResponse.json({ error: "accountId required" }, { status: 400 });
+  if (!accountId || !ownAccount(user.id, Number(accountId))) {
+    return NextResponse.json({ error: "Account not found" }, { status: 404 });
+  }
 
   const state = `${accountId}.${randomUUID()}`;
   const res = NextResponse.redirect(authUrl(state));

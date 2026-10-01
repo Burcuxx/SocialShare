@@ -20,6 +20,10 @@ npm run dev -- -H 0.0.0.0   # reachable from your phone on the same Wi-Fi
 
 Tokens and API keys live only in `.env` (gitignored). The SQLite database (`data/`) and temporary video files (`tmp/`) are not committed.
 
+## Sign in
+
+Open the app and register with an email and password; every page needs a signed-in user and each user only sees their own accounts. Accounts that existed before sign-in was added belong to the first user who registers. Passwords are hashed with scrypt; sessions last 30 days (only a hash of the session token is stored).
+
 ## YouTube setup
 
 1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable **YouTube Data API v3**.

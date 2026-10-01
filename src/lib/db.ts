@@ -3,8 +3,23 @@ import path from "node:path";
 import Database from "better-sqlite3";
 
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id             INTEGER PRIMARY KEY,
+  email          TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash  TEXT NOT NULL,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Only a hash of the session token is stored; the token itself lives in the cookie.
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash  TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id),
+  expires_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS accounts (
   id          INTEGER PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id),
   name        TEXT NOT NULL,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -51,7 +66,9 @@ CREATE TABLE IF NOT EXISTS jobs (
 
 export type Platform = "youtube" | "tiktok" | "instagram";
 
-export type Account = { id: number; name: string; created_at: string };
+export type User = { id: number; email: string; password_hash: string; created_at: string };
+
+export type Account = { id: number; user_id: number | null; name: string; created_at: string };
 
 export type Connection = {
   id: number;
@@ -96,6 +113,12 @@ function open() {
   db.pragma("foreign_keys = ON");
   migrate(db);
   db.exec(SCHEMA);
+  // v2: accounts belong to a user. Existing accounts get user_id NULL and are
+  // claimed by the first user who registers.
+  const accountCols = db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[];
+  if (!accountCols.some((c) => c.name === "user_id")) {
+    db.exec("ALTER TABLE accounts ADD COLUMN user_id INTEGER REFERENCES users(id)");
+  }
   return db;
 }
 

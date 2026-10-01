@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { createAccount } from "@/app/actions";
+import { createAccount, logout } from "@/app/actions";
 
 type Item = { id: number; name: string };
 
-export function Sidebar({ accounts }: { accounts: Item[] }) {
+export function Sidebar({ accounts, email }: { accounts: Item[]; email: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const activeId = Number(pathname.match(/^\/accounts\/(\d+)/)?.[1]);
@@ -44,6 +44,12 @@ export function Sidebar({ accounts }: { accounts: Item[] }) {
           <input type="text" name="name" placeholder="Yeni hesap" required />
           <button aria-label="Hesap ekle">+</button>
         </form>
+        <div className="nav-user">
+          <span className="muted">{email}</span>
+          <form action={logout}>
+            <button>Çıkış</button>
+          </form>
+        </div>
       </nav>
     </aside>
   );
