@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# Next.js build
+.next/
+out/
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# local data
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# temporary video files
+tmp/
+
+# misc
+.DS_Store
+*.log
+*.tsbuildinfo
+next-env.d.ts
