@@ -45,7 +45,7 @@ export const tr = {
     notes: {
       youtube: "Google onaylayana kadar \"Özel\" yüklenir.",
       tiktok: "TikTok onaylayana kadar herkese açık hesaplarda taslak olarak gider; metni sen yapıştırırsın.",
-      instagram: "",
+      instagram: "Reels olarak paylaşılır, profilinde de görünür.",
     },
     notConnected: "Bağlı değil",
     captionNote:

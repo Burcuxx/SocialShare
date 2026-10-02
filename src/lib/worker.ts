@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { db, type Connection, type Job, type Video } from "./db";
+import * as instagram from "./instagram";
 import * as tiktok from "./tiktok";
 import * as youtube from "./youtube";
 
@@ -11,6 +12,7 @@ type Uploader = (conn: Connection, filePath: string, job: Job, video: Video) => 
 const uploaders: Partial<Record<Connection["platform"], Uploader>> = {
   youtube: (conn, filePath, job) =>
     youtube.uploadVideo(conn, filePath, job.title ?? "", job.caption ?? ""),
+  instagram: (conn, filePath, job) => instagram.publishReel(conn, filePath, job.caption ?? ""),
   tiktok: (conn, filePath, job, video) =>
     tiktok.publishVideo(conn, filePath, job.caption ?? "", video.duration_sec),
 };

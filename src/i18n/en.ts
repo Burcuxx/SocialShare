@@ -45,7 +45,7 @@ export const en: Dict = {
     notes: {
       youtube: "Uploaded as \"Private\" until Google approves the app.",
       tiktok: "Until TikTok approves the app, public accounts get it as a draft; you paste the caption.",
-      instagram: "",
+      instagram: "Posted as a Reel and shown on your profile grid.",
     },
     notConnected: "Not connected",
     captionNote:

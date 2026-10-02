@@ -47,6 +47,17 @@ Uploads use the `youtube.upload` scope. Until the Google project passes the YouT
 
 Videos are posted directly with their caption (Direct Post). Until TikTok audits the app, Direct Post only works for private accounts (as "only me"); for public accounts the app falls back to sending a draft to the TikTok inbox and offers a "copy caption" button. Scopes: `user.info.basic`, `video.publish`, `video.upload`. Once the app is audited, posts go out public automatically.
 
+## Instagram setup
+
+Instagram only accepts a file upload from your computer through **Facebook Login for Business**, so:
+
+1. Your Instagram account must be **Professional** (Business or Creator) and **linked to a Facebook Page**.
+2. At [Meta for Developers](https://developers.facebook.com/apps/) create an app (type **Business**) and add **Facebook Login for Business** and **Instagram** (Instagram API with Facebook Login).
+3. Keep the app in **Development** mode: you (as the app admin) can use every permission without App Review, and `http://localhost` redirects are allowed. Redirect URI: `http://localhost:3000/api/auth/instagram/callback`
+4. Put the app ID and secret into `.env` (`META_APP_ID`, `META_APP_SECRET`).
+
+Permissions: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `business_management`. Videos are posted as Reels (also shown on the profile grid); limit 100 posts per 24 hours. Tokens last about 60 days and are renewed automatically in the last week; after that the app asks you to reconnect.
+
 ## Scheduling
 
 A video can be sent right away or scheduled for a date and time. The app sends it itself, so the computer and the app must be running then; if they aren't, it's sent as soon as they are.

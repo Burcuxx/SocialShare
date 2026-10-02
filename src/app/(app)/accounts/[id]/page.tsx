@@ -67,6 +67,7 @@ export default async function AccountPage({
         <div className="row">
           <a className="btn btn-sm" href={`/api/auth/youtube?accountId=${account.id}`}>+ YouTube</a>
           <a className="btn btn-sm" href={`/api/auth/tiktok?accountId=${account.id}`}>+ TikTok</a>
+          <a className="btn btn-sm" href={`/api/auth/instagram?accountId=${account.id}`}>+ Instagram</a>
         </div>
       </section>
 

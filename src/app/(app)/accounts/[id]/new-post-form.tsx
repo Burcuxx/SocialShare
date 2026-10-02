@@ -243,6 +243,7 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
             <div className="row">
               <a className="btn" href={`/api/auth/youtube?accountId=${accountId}`}>+ YouTube</a>
               <a className="btn" href={`/api/auth/tiktok?accountId=${accountId}`}>+ TikTok</a>
+              <a className="btn" href={`/api/auth/instagram?accountId=${accountId}`}>+ Instagram</a>
             </div>
           </div>
         )}
@@ -251,7 +252,7 @@ export function NewPostForm({ accountId, targets }: { accountId: number; targets
           <label key={x.id} className={`target${selected.has(x.id) ? " selected" : ""}`}>
             <PlatformMark platform={x.platform} />
             <span className="target-body">
-              <strong>{PLATFORM_NAMES[x.platform]}</strong>
+              <strong>{x.platform === "instagram" ? "Instagram Reels" : PLATFORM_NAMES[x.platform]}</strong>
               <span className="muted ellipsis">{x.name}</span>
               {t.newPost.notes[x.platform] && <span className="warn-note">{t.newPost.notes[x.platform]}</span>}
             </span>

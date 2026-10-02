@@ -158,6 +158,13 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                     ) : (
                       <div className="note">{t.post.done[conn.platform]}</div>
                     )}
+                    {conn.platform === "instagram" && job.remote_id?.startsWith("https://") && (
+                      <div className="row">
+                        <a className="btn btn-sm" href={job.remote_id} target="_blank" rel="noreferrer">
+                          {t.post.openVideo} ↗
+                        </a>
+                      </div>
+                    )}
                     {conn.platform === "youtube" && (
                       <div className="row">
                         {job.remote_id && (

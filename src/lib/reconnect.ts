@@ -6,7 +6,7 @@ import { db, type Platform } from "./db";
  * revoked or expired tokens.
  */
 const AUTH_ERROR =
-  /scope_not_authorized|access_token_invalid|access_token_expired|insufficient.?(permission|scope)|ACCESS_TOKEN_SCOPE_INSUFFICIENT|invalid_grant|UNAUTHENTICATED|"code":\s*401|token expired; reconnect/i;
+  /scope_not_authorized|access_token_invalid|access_token_expired|insufficient.?(permission|scope)|ACCESS_TOKEN_SCOPE_INSUFFICIENT|invalid_grant|UNAUTHENTICATED|"code":\s*401|token expired; reconnect|Instagram API error \((190|10|200)\)/i;
 
 export function needsReconnect(error: string | null) {
   return !!error && AUTH_ERROR.test(error);
